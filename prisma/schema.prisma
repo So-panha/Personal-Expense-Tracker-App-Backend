@@ -6,111 +6,75 @@ datasource db {
   provider = "postgresql"
 }
 
-
-enum Role {
-  USER
-  ADMIN
-}
-
-enum CategoryType {
-  INCOME
-  EXPENSE
-}
-
 model User {
-  id            String        @id @default(uuid())
-  email         String        @unique
-  password      String
-  fullName      String
-  role          Role          @default(USER)
-  avatar        String?
-  emailVerified Boolean       @default(false)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                    Int                    @id @default(autoincrement())
+  username              String                 @unique(map: "ix_users_username") @db.VarChar
+  email                 String                 @unique(map: "ix_users_email") @db.VarChar
+  hashed_password       String?                @db.VarChar
+  full_name             String?                @db.VarChar
+  location              String?                @db.VarChar
+  avatar_url            String?                @db.VarChar
+  role                  role
+  status                userstatus
+  failed_login_attempts Int
+  is_deleted            Boolean
+  consultation_history  consultation_history[]
+  payment_methods       payment_methods[]
+  user_preferences      user_preferences?
 
-  categories   Category[]
-  transactions Transaction[]
-  budgets      Budget[]
-  goals        Goal[]
-  otps         Otp[]
-
+  @@index([id], map: "ix_users_id")
   @@map("users")
 }
 
-model Otp {
-  id        String   @id @default(uuid())
-  email     String
-  code      String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+model consultation_history {
+  id        Int      @id @default(autoincrement())
+  user_id   Int
+  title     String   @db.VarChar
+  text      String   @db.VarChar
+  tags      Json     @default("[]")
+  icon      String   @db.VarChar
+  timestamp DateTime @db.Timestamptz(6)
+  users     User     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@map("otps")
+  @@index([id], map: "ix_consultation_history_id")
+  @@index([user_id], map: "ix_consultation_history_user_id")
 }
 
-model Category {
-  id       String       @id @default(uuid())
-  name     String
-  type     CategoryType
-  isSystem Boolean      @default(false)
-  userId   String
-  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+model payment_methods {
+  id          Int     @id @default(autoincrement())
+  user_id     Int
+  card_type   String  @db.VarChar
+  last4       String  @db.VarChar(4)
+  expiry      String  @db.VarChar(5)
+  is_default  Boolean
+  bg_gradient String? @db.VarChar
+  users       User    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  transactions Transaction[]
-  budgets      Budget[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("categories")
+  @@index([id], map: "ix_payment_methods_id")
+  @@index([user_id], map: "ix_payment_methods_user_id")
 }
 
-model Transaction {
-  id              String   @id @default(uuid())
-  amount          BigInt
-  transactionDate DateTime
-  notes           String   @default("")
-  fileUrl         String?
-  categoryId      String
-  category        Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model user_preferences {
+  id                Int     @id @default(autoincrement())
+  user_id           Int     @unique(map: "ix_user_preferences_user_id")
+  dark_mode         Boolean
+  compact_view      Boolean
+  reduce_animations Boolean
+  push_alerts       Boolean
+  storm_warning     Boolean
+  location_services Boolean
+  users             User    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("transactions")
+  @@index([id], map: "ix_user_preferences_id")
 }
 
-model Budget {
-  id          String   @id @default(uuid())
-  limitAmount BigInt
-  month       Int
-  year        Int
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, categoryId, month, year])
-  @@map("budgets")
+enum role {
+  ADMIN
+  USER
 }
 
-model Goal {
-  id            String   @id @default(uuid())
-  name          String
-  targetAmount  BigInt
-  currentAmount BigInt   @default(0)
-  deadline      DateTime
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("goals")
+enum userstatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
 }
