@@ -28,6 +28,10 @@ services:
       - key: SMTP_PASS
         sync: false          # Set manually in Render dashboard
       - key: ALLOWED_ORIGINS
-        sync: false          # e.g. https://yourapp.com — leave empty to allow all
-      - key: RESEND_API_KEY
-        sync: false          # Set manually in Render dashboard
+        sync: false          # e.g. https://yourapp.com — leave empty to allow all  
+      - key: GOOGLE_CLIENT_ID
+        sync: false       
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false        
+      - key: GOOGLE_REFRESH_TOKEN
+        sync: false         
