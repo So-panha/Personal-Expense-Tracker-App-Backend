@@ -159,88 +159,68 @@
 // }
 
 // module.exports = { sendOtpEmail, sendResetEmail, sendEmailChangeVerification };
+const { google } = require('googleapis');
 
+// 1. Configure the OAuth2 Client
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  'https://developers.google.com/oauthplayground' // Or your redirect URI
+);
 
-const nodemailer = require('nodemailer');
-
-// Configure the transporter using Gmail API (OAuth2)
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    type: 'OAuth2',
-    user: process.env.SMTP_USER, // Your gmail (e.g. example@gmail.com)
-    clientId: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
-  },
+oauth2Client.setCredentials({
+  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
 });
 
-const SENDER_EMAIL = process.env.SMTP_USER;
+const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
 /**
- * Send OTP email
+ * Helper to encode the email into base64url format (required by Gmail API)
+ */
+function buildRawEmail(to, subject, htmlBody) {
+  const messageParts = [
+    `From: "Expense Tracker" <${process.env.SMTP_USER}>`,
+    `To: ${to}`,
+    'Content-Type: text/html; charset=utf-8',
+    'MIME-Version: 1.0',
+    `Subject: ${subject}`,
+    '',
+    htmlBody,
+  ];
+  const message = messageParts.join('\n');
+
+  return Buffer.from(message)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+/**
+ * Send OTP email via actual HTTP Gmail API
  */
 async function sendOtpEmail(to, code) {
   try {
-    await transporter.sendMail({
-      from: `"Expense Tracker" <${SENDER_EMAIL}>`,
+    const raw = buildRawEmail(
       to,
-      subject: 'Your OTP Code - Expense Tracker',
-      html: `
+      'Your OTP Code - Expense Tracker',
+      `
         <h2>Your Verification Code</h2>
         <p>Your OTP code is: <strong>${code}</strong></p>
         <p>This code expires in 5 minutes.</p>
-      `,
+      `
+    );
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw },
     });
-    console.log(`OTP email sent to ${to}`);
+
+    console.log(`OTP email sent via Gmail API to ${to}`);
   } catch (err) {
-    console.error('Failed to send OTP email:', err.message);
+    console.error('Failed to send OTP email via API:', err.message);
     console.log(`[DEV] OTP for ${to}: ${code}`);
   }
 }
 
-/**
- * Send password reset email
- */
-async function sendResetEmail(to, token) {
-  try {
-    await transporter.sendMail({
-      from: `"Expense Tracker" <${SENDER_EMAIL}>`,
-      to,
-      subject: 'Password Reset - Expense Tracker',
-      html: `
-        <h2>Reset Your Password</h2>
-        <p>Your password reset token is: <strong>${token}</strong></p>
-        <p>This token expires in 15 minutes.</p>
-      `,
-    });
-    console.log(`Reset email sent to ${to}`);
-  } catch (err) {
-    console.error('Failed to send reset email:', err.message);
-    console.log(`[DEV] Reset token for ${to}: ${token}`);
-  }
-}
-
-/**
- * Send email change verification
- */
-async function sendEmailChangeVerification(to, token) {
-  try {
-    await transporter.sendMail({
-      from: `"Expense Tracker" <${SENDER_EMAIL}>`,
-      to,
-      subject: 'Email Change Verification - Expense Tracker',
-      html: `
-        <h2>Verify Your New Email</h2>
-        <p>Your verification token is: <strong>${token}</strong></p>
-        <p>This token expires in 15 minutes.</p>
-      `,
-    });
-    console.log(`Email change verification sent to ${to}`);
-  } catch (err) {
-    console.error('Failed to send email change verification:', err.message);
-    console.log(`[DEV] Email change token for ${to}: ${token}`);
-  }
-}
-
-module.exports = { sendOtpEmail, sendResetEmail, sendEmailChangeVerification };
+module.exports = { sendOtpEmail };
