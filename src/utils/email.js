@@ -157,15 +157,13 @@
 //     console.log(`[DEV] Email change token for ${to}: ${token}`);
 //   }
 // }
-
-// module.exports = { sendOtpEmail, sendResetEmail, sendEmailChangeVerification };
 const { google } = require('googleapis');
 
-// 1. Configure the OAuth2 Client
+// Configure the OAuth2 Client
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  'https://developers.google.com/oauthplayground' // Or your redirect URI
+  'https://developers.google.com/oauthplayground' // Or your specific redirect URI
 );
 
 oauth2Client.setCredentials({
@@ -173,13 +171,14 @@ oauth2Client.setCredentials({
 });
 
 const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+const SENDER_EMAIL = process.env.SMTP_USER;
 
 /**
- * Helper to encode the email into base64url format (required by Gmail API)
+ * Helper to encode the email into base64url format (required by Gmail REST API)
  */
 function buildRawEmail(to, subject, htmlBody) {
   const messageParts = [
-    `From: "Expense Tracker" <${process.env.SMTP_USER}>`,
+    `From: "Expense Tracker" <${SENDER_EMAIL}>`,
     `To: ${to}`,
     'Content-Type: text/html; charset=utf-8',
     'MIME-Version: 1.0',
@@ -197,7 +196,7 @@ function buildRawEmail(to, subject, htmlBody) {
 }
 
 /**
- * Send OTP email via actual HTTP Gmail API
+ * Send OTP email
  */
 async function sendOtpEmail(to, code) {
   try {
@@ -215,12 +214,68 @@ async function sendOtpEmail(to, code) {
       userId: 'me',
       requestBody: { raw },
     });
-
     console.log(`OTP email sent via Gmail API to ${to}`);
   } catch (err) {
-    console.error('Failed to send OTP email via API:', err.message);
+    console.error('Failed to send OTP email:', err.message);
     console.log(`[DEV] OTP for ${to}: ${code}`);
   }
 }
 
-module.exports = { sendOtpEmail };
+/**
+ * Send password reset email
+ */
+async function sendResetEmail(to, token) {
+  try {
+    const raw = buildRawEmail(
+      to,
+      'Password Reset - Expense Tracker',
+      `
+        <h2>Reset Your Password</h2>
+        <p>Your password reset token is: <strong>${token}</strong></p>
+        <p>This token expires in 15 minutes.</p>
+      `
+    );
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw },
+    });
+    console.log(`Reset email sent via Gmail API to ${to}`);
+  } catch (err) {
+    console.error('Failed to send reset email:', err.message);
+    console.log(`[DEV] Reset token for ${to}: ${token}`);
+  }
+}
+
+/**
+ * Send email change verification
+ */
+async function sendEmailChangeVerification(to, token) {
+  try {
+    const raw = buildRawEmail(
+      to,
+      'Email Change Verification - Expense Tracker',
+      `
+        <h2>Verify Your New Email</h2>
+        <p>Your verification token is: <strong>${token}</strong></p>
+        <p>This token expires in 15 minutes.</p>
+      `
+    );
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw },
+    });
+    console.log(`Email change verification sent via Gmail API to ${to}`);
+  } catch (err) {
+    console.error('Failed to send email change verification:', err.message);
+    console.log(`[DEV] Email change token for ${to}: ${token}`);
+  }
+}
+
+// CRITICAL: Make sure all three functions are exported here!
+module.exports = { 
+  sendOtpEmail, 
+  sendResetEmail, 
+  sendEmailChangeVerification 
+};
