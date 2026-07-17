@@ -157,6 +157,8 @@
 //     console.log(`[DEV] Email change token for ${to}: ${token}`);
 //   }
 // }
+
+
 const { google } = require('googleapis');
 
 // Configure the OAuth2 Client
@@ -169,7 +171,7 @@ const oauth2Client = new google.auth.OAuth2(
 oauth2Client.setCredentials({
   refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
 });
-
+      
 const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 const SENDER_EMAIL = process.env.SMTP_USER;
 

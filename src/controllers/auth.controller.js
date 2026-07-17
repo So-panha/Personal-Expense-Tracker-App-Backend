@@ -357,20 +357,39 @@ exports.resetPassword = async (req, res, next) => {
 // POST /auth/google
 exports.loginWithGoogle = async (req, res, next) => {
   try {
-    const { idToken } = req.body;
-    if (!idToken) return error(res, 'idToken is required', 400);
-
-    // Verify Google ID token using Google tokeninfo API
-    const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
-    if (!response.ok) {
-      return error(res, 'Invalid Google ID token', 400);
+    const { idToken, accessToken } = req.body;
+    if (!idToken && !accessToken) {
+      return error(res, 'idToken or accessToken is required', 400);
     }
-    const payload = await response.json();
-    const { email, name, picture } = payload;
+
+    let email, name, picture;
+
+    if (idToken) {
+      // Verify Google ID token using Google tokeninfo API
+      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+      if (!response.ok) {
+        return error(res, 'Invalid Google ID token', 400);
+      }
+      const payload = await response.json();
+      email = payload.email;
+      name = payload.name;
+      picture = payload.picture;
+    } else {
+      // Verify Google access token using userinfo API
+      const response = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`);
+      if (!response.ok) {
+        return error(res, 'Invalid Google access token', 400);
+      }
+      const payload = await response.json();
+      email = payload.email;
+      name = payload.name;
+      picture = payload.picture;
+    }
 
     if (!email) {
       return error(res, 'Email not provided by Google account', 400);
     }
+
 
     let user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
